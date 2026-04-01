@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Trading Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0a0c0f;
+  --surface:   #0f1217;
+  --border:    #1c2030;
+  --border2:   #252d3d;
+  --text:      #c8d0e0;
+  --muted:     #4a556b;
+  --dim:       #2e3a50;
+
+  --bull:      #00e5a0;
+  --bull-dim:  #003d2a;
+  --bear:      #ff4560;
+  --bear-dim:  #3d000f;
+  --neutral:   #ffb830;
+  --neutral-dim:#3d2c00;
+
+  --a-tier:    #00e5a0;
+  --b-tier:    #ffb830;
+  --none-tier: #4a556b;
+
+  --squeeze:   #ff4560;
+  --fired:     #00e5a0;
+
+  --accent:    #3d7fff;
+  --accent2:   #7b5fff;
+
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: 'IBM Plex Sans', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Header ── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+
+.header h1 {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.updated-time {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.refresh-btn {
+  background: var(--border);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.refresh-btn:hover { background: var(--border2); }
+.refresh-btn.loading { opacity: 0.5; pointer-events: none; }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  padding: 10px 16px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Loading State ── */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  gap: 16px;
+}
+
+.spinner {
+  width: 32px; height: 32px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-text {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+
+/* ── Main Content ── */
+.content { padding: 0 0 80px 0; }
+
+/* ── Group Header ── */
+.group-header {
+  padding: 8px 16px 6px;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+  text-transform: uppercase;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+/* ── Instrument Row ── */
+.instrument-row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.instrument-row:hover { background: #141820; }
+.instrument-row.expanded { background: #141820; }
+
+.row-main {
+  display: grid;
+  grid-template-columns: 80px auto 1fr;
+  align-items: center;
+  padding: 10px 16px;
+  gap: 12px;
+  width: 100%;
+  grid-column: 1 / -1;
+}
+
+.inst-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+.inst-id {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  margin-top: 1px;
+}
+
+.price-block {
+  text-align: right;
+}
+.inst-price {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.inst-change {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.inst-change.pos { color: var(--bull); }
+.inst-change.neg { color: var(--bear); }
+
+.badges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.badge {
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.badge-bias-long  { background: var(--bull-dim);    color: var(--bull);    border: 1px solid var(--bull); }
+.badge-bias-short { background: var(--bear-dim);    color: var(--bear);    border: 1px solid var(--bear); }
+.badge-bias-neut  { background: var(--neutral-dim); color: var(--neutral); border: 1px solid var(--neutral); }
+
+.badge-stack-bull  { background: rgba(0,229,160,0.08); color: var(--bull);  border: 1px solid rgba(0,229,160,0.25); }
+.badge-stack-bear  { background: rgba(255,69,96,0.08);  color: var(--bear);  border: 1px solid rgba(255,69,96,0.25); }
+.badge-stack-mixed { background: rgba(74,85,107,0.15);  color: var(--muted); border: 1px solid var(--dim); }
+
+.badge-squeeze { background: rgba(255,69,96,0.12); color: var(--squeeze); border: 1px solid rgba(255,69,96,0.3); }
+.badge-fired   { background: rgba(0,229,160,0.12); color: var(--fired);   border: 1px solid rgba(0,229,160,0.3); }
+
+.tier-badge {
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.tier-a    { background: rgba(0,229,160,0.15); color: var(--a-tier); border: 1px solid var(--a-tier); }
+.tier-b    { background: rgba(255,184,48,0.12); color: var(--b-tier); border: 1px solid var(--b-tier); }
+.tier-none { background: transparent; color: var(--muted); border: 1px solid var(--dim); }
+
+/* ── Expanded Detail ── */
+.row-detail {
+  display: none;
+  grid-column: 1 / -1;
+  padding: 0 16px 14px;
+  border-top: 1px solid var(--border);
+}
+.row-detail.open { display: block; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.detail-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.detail-card.full { grid-column: 1 / -1; }
+
+.detail-label {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.detail-val {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-sub {
+  font-size: 10px;
+  margin-top: 2px;
+}
+.detail-sub.pos { color: var(--bull); }
+.detail-sub.neg { color: var(--bear); }
+.detail-sub.neu { color: var(--muted); }
+
+.ema-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.ema-item {
+  text-align: center;
+}
+.ema-label {
+  font-size: 8px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+.ema-value {
+  font-size: 11px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.tv-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 10px;
+  color: var(--accent);
+  text-decoration: none;
+  letter-spacing: 0.08em;
+  padding: 5px 10px;
+  border: 1px solid rgba(61,127,255,0.3);
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.tv-link:hover { background: rgba(61,127,255,0.1); }
+
+/* ── Key Levels Input ── */
+.levels-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 8px;
+  margin-top: 4px;
+  resize: vertical;
+  min-height: 52px;
+}
+.levels-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.levels-save {
+  margin-top: 6px;
+  background: rgba(61,127,255,0.1);
+  border: 1px solid rgba(61,127,255,0.3);
+  color: var(--accent);
+  padding: 5px 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.levels-save:hover { background: rgba(61,127,255,0.2); }
+
+/* ── Econ Calendar ── */
+.calendar-view {
+  padding: 16px;
+}
+.calendar-date-group { margin-bottom: 20px; }
+.calendar-date {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.cal-event {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  margin-bottom: 6px;
+}
+.cal-time {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cal-name {
+  font-size: 11px;
+  color: var(--text);
+}
+.cal-currency {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.impact-high   { border-left: 3px solid var(--bear); }
+.impact-medium { border-left: 3px solid var(--neutral); }
+
+.no-events {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 40px;
+}
+
+/* ── Error state ── */
+.row-error {
+  padding: 10px 16px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ── Pulse dot for live ── */
+.live-dot {
+  width: 6px; height: 6px;
+  background: var(--bull);
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Summary bar ── */
+.summary-bar {
+  display: flex;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.summary-bar::-webkit-scrollbar { display: none; }
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.summary-label {
+  font-size: 8px;
+  color: var(--muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.summary-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+.sv-bull { color: var(--bull); }
+.sv-bear { color: var(--bear); }
+.sv-a    { color: var(--a-tier); }
+.sv-b    { color: var(--b-tier); }
+
+@media (min-width: 640px) {
+  .detail-grid { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">📈</div>
+    <div>
+      <h1>EDGE SCAN</h1>
+      <div class="updated-time" id="updatedTime">Loading…</div>
+    </div>
+  </div>
+  <button class="refresh-btn" id="refreshBtn" onclick="forceRefresh()">↺ REFRESH</button>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('dashboard', this)">Dashboard</div>
+  <div class="tab" onclick="showTab('calendar', this)">Calendar</div>
+  <div class="tab" onclick="showTab('levels', this)">Key Levels</div>
+</div>
+
+<!-- Dashboard Tab -->
+<div id="tab-dashboard" class="content">
+  <div id="summaryBar" class="summary-bar" style="display:none">
+    <div class="summary-stat">
+      <span class="summary-label">A-Tier</span>
+      <span class="summary-value sv-a" id="sumA">—</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-label">B-Tier</span>
+      <span class="summary-value sv-b" id="sumB">—</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-label">Bull Bias</span>
+      <span class="summary-value sv-bull" id="sumBull">—</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-label">Bear Bias</span>
+      <span class="summary-value sv-bear" id="sumBear">—</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-label">In Squeeze</span>
+      <span class="summary-value" style="color:var(--squeeze)" id="sumSqueeze">—</span>
+    </div>
+    <div class="summary-stat">
+      <span class="summary-label"><span class="live-dot"></span> Live</span>
+      <span class="summary-value" style="color:var(--muted)" id="sumLive">—</span>
+    </div>
+  </div>
+  <div id="instrumentList">
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <div class="loading-text">FETCHING MARKET DATA…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar Tab -->
+<div id="tab-calendar" class="content" style="display:none">
+  <div class="calendar-view" id="calendarView">
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <div class="loading-text">LOADING CALENDAR…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Key Levels Tab -->
+<div id="tab-levels" class="content" style="display:none">
+  <div id="levelsView" style="padding:16px">
+    <div class="loading-state">
+      <div class="spinner"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let dashData = null;
+let userLevels = JSON.parse(localStorage.getItem('tradingLevels') || '{}');
+let expandedRows = new Set();
+
+const INSTRUMENT_CONFIG = {{ instruments | tojson }};
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  loadData();
+});
+
+async function loadData() {
+  try {
+    const res = await fetch('/api/data');
+    dashData = await res.json();
+    render();
+  } catch(e) {
+    document.getElementById('instrumentList').innerHTML =
+      '<div class="loading-state"><div style="color:var(--bear);font-size:12px">Failed to load data. Check connection.</div></div>';
+  }
+}
+
+async function forceRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('loading');
+  btn.textContent = '↺ …';
+  try {
+    await fetch('/api/refresh');
+    await loadData();
+  } finally {
+    btn.classList.remove('loading');
+    btn.textContent = '↺ REFRESH';
+  }
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+function showTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['dashboard','calendar','levels'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+  });
+  if (name === 'calendar' && dashData) renderCalendar();
+  if (name === 'levels' && dashData) renderLevels();
+}
+
+// ── Render Dashboard ──────────────────────────────────────────────────────
+function render() {
+  if (!dashData) return;
+
+  document.getElementById('updatedTime').textContent = dashData.updated_at;
+
+  // Summary stats
+  const insts = dashData.instruments;
+  let aCount=0, bCount=0, bullCount=0, bearCount=0, squeezeCount=0, liveCount=0;
+  Object.values(insts).forEach(d => {
+    if (!d) return;
+    liveCount++;
+    if (d.tier === 'A') aCount++;
+    if (d.tier === 'B') bCount++;
+    if (d.bias === 'LONG') bullCount++;
+    if (d.bias === 'SHORT') bearCount++;
+    if (d.squeeze && d.squeeze.state === 'squeeze') squeezeCount++;
+  });
+  document.getElementById('sumA').textContent = aCount;
+  document.getElementById('sumB').textContent = bCount;
+  document.getElementById('sumBull').textContent = bullCount;
+  document.getElementById('sumBear').textContent = bearCount;
+  document.getElementById('sumSqueeze').textContent = squeezeCount;
+  document.getElementById('sumLive').textContent = liveCount + '/' + INSTRUMENT_CONFIG.length;
+  document.getElementById('summaryBar').style.display = 'flex';
+
+  // Group instruments
+  const groups = {};
+  INSTRUMENT_CONFIG.forEach(inst => {
+    if (!groups[inst.group]) groups[inst.group] = [];
+    groups[inst.group].push(inst);
+  });
+
+  let html = '';
+  Object.entries(groups).forEach(([group, instruments]) => {
+    html += `<div class="group-header">${group}</div>`;
+    instruments.forEach(inst => {
+      const d = insts[inst.id];
+      html += renderRow(inst, d);
+    });
+  });
+
+  document.getElementById('instrumentList').innerHTML = html;
+}
+
+function renderRow(inst, d) {
+  if (!d) {
+    return `
+      <div class="instrument-row">
+        <div class="row-main">
+          <div><div class="inst-name">${inst.name}</div><div class="inst-id">${inst.id}</div></div>
+          <div></div>
+          <div class="row-error">Data unavailable</div>
+        </div>
+      </div>`;
+  }
+
+  const chgClass = d.change_pct >= 0 ? 'pos' : 'neg';
+  const chgSign  = d.change_pct >= 0 ? '+' : '';
+  const biasBadge = d.bias === 'LONG'
+    ? `<span class="badge badge-bias-long">LONG</span>`
+    : d.bias === 'SHORT'
+    ? `<span class="badge badge-bias-short">SHORT</span>`
+    : `<span class="badge badge-bias-neut">NEUT</span>`;
+
+  const stackBadge = d.ema_stack === 'BULL'
+    ? `<span class="badge badge-stack-bull">21>50>200</span>`
+    : d.ema_stack === 'BEAR'
+    ? `<span class="badge badge-stack-bear">21<50<200</span>`
+    : `<span class="badge badge-stack-mixed">MIXED</span>`;
+
+  const sqBadge = d.squeeze.state === 'squeeze'
+    ? `<span class="badge badge-squeeze">SQZ</span>`
+    : `<span class="badge badge-fired">FIRED</span>`;
+
+  const tierClass = d.tier === 'A' ? 'tier-a' : d.tier === 'B' ? 'tier-b' : 'tier-none';
+  const tierBadge = `<span class="tier-badge ${tierClass}">${d.tier === 'NONE' ? '—' : d.tier}</span>`;
+
+  const priceStr = formatPrice(d.price);
+
+  const isExpanded = expandedRows.has(inst.id);
+  const detailClass = isExpanded ? 'open' : '';
+  const rowClass = isExpanded ? 'expanded' : '';
+
+  // Detail content
+  const vwap52wDist = d.vwap_52w_dist !== null
+    ? `<div class="detail-sub ${d.vwap_52w_dist >= 0 ? 'pos' : 'neg'}">${d.vwap_52w_dist >= 0 ? '+' : ''}${d.vwap_52w_dist}% from price</div>`
+    : '';
+  const vwap5yDist = d.vwap_5y_dist !== null
+    ? `<div class="detail-sub ${d.vwap_5y_dist >= 0 ? 'pos' : 'neg'}">${d.vwap_5y_dist >= 0 ? '+' : ''}${d.vwap_5y_dist}% from price</div>`
+    : '';
+
+  const distClass = d.dist_200 >= 0 ? 'pos' : 'neg';
+
+  const levels = userLevels[inst.id] || '';
+
+  return `
+    <div class="instrument-row ${rowClass}" id="row-${inst.id}">
+      <div class="row-main" onclick="toggleRow('${inst.id}')">
+        <div>
+          <div class="inst-name">${inst.name}</div>
+          <div class="inst-id">${inst.id}</div>
+        </div>
+        <div class="price-block">
+          <div class="inst-price">${priceStr}</div>
+          <div class="inst-change ${chgClass}">${chgSign}${d.change_pct}%</div>
+        </div>
+        <div class="badges">
+          ${tierBadge}
+          ${biasBadge}
+          ${stackBadge}
+          ${sqBadge}
+        </div>
+      </div>
+      <div class="row-detail ${detailClass}" id="detail-${inst.id}">
+        <div class="detail-grid">
+          <div class="detail-card">
+            <div class="detail-label">200 EMA</div>
+            <div class="detail-val">${formatPrice(d.ema200)}</div>
+            <div class="detail-sub ${distClass}">${d.dist_200 >= 0 ? '+' : ''}${d.dist_200}% from price</div>
+          </div>
+          <div class="detail-card">
+            <div class="detail-label">TTM Squeeze</div>
+            <div class="detail-val">${d.squeeze.state.toUpperCase()}</div>
+            <div class="detail-sub neu">Hist ${d.squeeze.histogram_dir} ${d.squeeze.histogram_growing ? '▲' : '▼'}</div>
+          </div>
+          <div class="detail-card">
+            <div class="detail-label">52W VWAP</div>
+            <div class="detail-val">${d.vwap_52w !== null ? formatPrice(d.vwap_52w) : 'N/A'}</div>
+            ${vwap52wDist}
+          </div>
+          <div class="detail-card">
+            <div class="detail-label">5Y VWAP</div>
+            <div class="detail-val">${d.vwap_5y !== null ? formatPrice(d.vwap_5y) : 'N/A'}</div>
+            ${vwap5yDist}
+          </div>
+          <div class="detail-card full">
+            <div class="detail-label">EMA Levels</div>
+            <div class="ema-row">
+              <div class="ema-item">
+                <div class="ema-label">EMA 21</div>
+                <div class="ema-value">${formatPrice(d.ema21)}</div>
+              </div>
+              <div class="ema-item">
+                <div class="ema-label">EMA 50</div>
+                <div class="ema-value">${formatPrice(d.ema50)}</div>
+              </div>
+              <div class="ema-item">
+                <div class="ema-label">EMA 200</div>
+                <div class="ema-value">${formatPrice(d.ema200)}</div>
+              </div>
+            </div>
+          </div>
+          <div class="detail-card full">
+            <div class="detail-label">Key Levels (your notes)</div>
+            <textarea class="levels-input" id="lvl-${inst.id}" placeholder="e.g. R: 21100, 21500 | S: 20800, 20200">${levels}</textarea>
+            <button class="levels-save" onclick="saveLevel('${inst.id}')">SAVE LEVELS</button>
+          </div>
+        </div>
+        <a class="tv-link" href="https://www.tradingview.com/chart/?symbol=${inst.tv}" target="_blank">
+          ↗ Open in TradingView
+        </a>
+      </div>
+    </div>`;
+}
+
+function toggleRow(id) {
+  const detail = document.getElementById('detail-' + id);
+  const row = document.getElementById('row-' + id);
+  if (expandedRows.has(id)) {
+    expandedRows.delete(id);
+    detail.classList.remove('open');
+    row.classList.remove('expanded');
+  } else {
+    expandedRows.add(id);
+    detail.classList.add('open');
+    row.classList.add('expanded');
+  }
+}
+
+// ── Key Levels ─────────────────────────────────────────────────────────────
+function saveLevel(id) {
+  const val = document.getElementById('lvl-' + id).value;
+  userLevels[id] = val;
+  localStorage.setItem('tradingLevels', JSON.stringify(userLevels));
+  const btn = event.target;
+  btn.textContent = '✓ SAVED';
+  setTimeout(() => btn.textContent = 'SAVE LEVELS', 1500);
+}
+
+function renderLevels() {
+  let html = '';
+  INSTRUMENT_CONFIG.forEach(inst => {
+    const levels = userLevels[inst.id] || '';
+    html += `
+      <div style="margin-bottom:16px">
+        <div style="font-size:10px;color:var(--muted);letter-spacing:0.12em;margin-bottom:5px">${inst.name} <span style="color:var(--dim)">${inst.id}</span></div>
+        <textarea class="levels-input" id="lvlp-${inst.id}" placeholder="R: levels | S: levels">${levels}</textarea>
+        <button class="levels-save" onclick="saveLevelPanel('${inst.id}')">SAVE</button>
+      </div>`;
+  });
+  document.getElementById('levelsView').innerHTML = html;
+}
+
+function saveLevelPanel(id) {
+  const val = document.getElementById('lvlp-' + id).value;
+  userLevels[id] = val;
+  localStorage.setItem('tradingLevels', JSON.stringify(userLevels));
+  const btn = event.target;
+  btn.textContent = '✓';
+  setTimeout(() => btn.textContent = 'SAVE', 1200);
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────
+function renderCalendar() {
+  if (!dashData || !dashData.calendar) return;
+  const events = dashData.calendar;
+
+  if (!events.length) {
+    document.getElementById('calendarView').innerHTML =
+      '<div class="no-events">No high/medium impact events found for today/tomorrow.</div>';
+    return;
+  }
+
+  // Group by date
+  const byDate = {};
+  events.forEach(e => {
+    const d = (e.date || '').split('T')[0];
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(e);
+  });
+
+  let html = '';
+  Object.entries(byDate).forEach(([date, evs]) => {
+    html += `<div class="calendar-date-group">
+      <div class="calendar-date">${formatDate(date)}</div>`;
+    evs.forEach(e => {
+      const time = (e.date || '').split('T')[1]?.slice(0,5) || '—';
+      const impactClass = e.impact === 'High' ? 'impact-high' : 'impact-medium';
+      html += `
+        <div class="cal-event ${impactClass}">
+          <div class="cal-time">${time}</div>
+          <div class="cal-name">${e.title || e.name || 'Event'}</div>
+          <div class="cal-currency">${e.country || e.currency || ''}</div>
+        </div>`;
+    });
+    html += '</div>';
+  });
+
+  document.getElementById('calendarView').innerHTML = html;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+function formatPrice(p) {
+  if (p === null || p === undefined) return '—';
+  if (p >= 1000) return p.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  if (p >= 10)   return p.toFixed(2);
+  if (p >= 1)    return p.toFixed(4);
+  return p.toFixed(5);
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+</script>
+</body>
+</html>
