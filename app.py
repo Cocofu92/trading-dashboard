@@ -286,8 +286,26 @@ def index():
 
 @app.route("/api/data")
 def api_data():
-    data = get_cached_data()
-    return jsonify(data)
+    try:
+        data = get_cached_data()
+        return jsonify(data)
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+
+@app.route("/api/debug")
+def api_debug():
+    """Test a single instrument and return detailed diagnostics."""
+    import traceback
+    try:
+        inst = INSTRUMENTS[11]  # NASDAQ
+        df = fetch_ohlcv(inst["ticker"])
+        if df is None:
+            return jsonify({"status": "fetch_failed", "ticker": inst["ticker"]})
+        result = calc_instrument(inst, df)
+        return jsonify({"status": "ok", "ticker": inst["ticker"], "rows": len(df), "result": result})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
 @app.route("/api/refresh")
