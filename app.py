@@ -58,16 +58,18 @@ def get_cached_data():
 def fetch_ohlcv(ticker, years=6):
     """Fetch historical OHLCV data for a ticker."""
     try:
-        end = datetime.now()
-        start = end - timedelta(days=years * 365 + 30)
-        df = yf.download(ticker, start=start, end=end, interval="1d",
-                         auto_adjust=True, progress=False)
-        if df.empty or len(df) < 50:
+        t = yf.Ticker(ticker)
+        period = f"{years}y"
+        df = t.history(period=period, interval="1d", auto_adjust=True)
+        if df is None or df.empty or len(df) < 50:
             return None
-        # Flatten MultiIndex columns if present
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+        # Normalise column names (yfinance 1.x may vary)
+        df.columns = [c.strip().title() for c in df.columns]
+        # Keep only what we need
+        cols = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in df.columns]
+        df = df[cols].dropna()
+        if "Volume" not in df.columns:
+            df["Volume"] = 1.0  # FX pairs have no volume; use 1 so VWAP still runs
         return df
     except Exception as e:
         print(f"Error fetching {ticker}: {e}")
